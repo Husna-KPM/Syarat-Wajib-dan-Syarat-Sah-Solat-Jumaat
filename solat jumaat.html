@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permainan Interaktif: Syarat Solat Jumaat</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
+        }
+
+        .draggable-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 40px;
+            z-index: 10;
+        }
+
+        .draggable {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            border-radius: 50px;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .draggable:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        #wajib-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border: 2px solid #60a5fa;
+        }
+
+        #sah-btn {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            border: 2px solid #a78bfa;
+        }
+
+        #score-board {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="score-board">Baki Jawapan: <span id="remaining">13</span></div>
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="draggable-zone">
+            <div id="wajib-btn" class="draggable" draggable="true" ondragstart="drag(event, 'wajib')">SYARAT WAJIB</div>
+            <div id="sah-btn" class="draggable" draggable="true" ondragstart="drag(event, 'sah')">SYARAT SAH</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const remainingEl = document.getElementById('remaining');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        const itemsData = [
+            // 7 Syarat Wajib
+            { text: "Islam", type: "wajib" },
+            { text: "Baligh", type: "wajib" },
+            { text: "Berakal", type: "wajib" },
+            { text: "Lelaki", type: "wajib" },
+            { text: "Sihat", type: "wajib" },
+            { text: "Bermukim", type: "wajib" },
+            { text: "Merdeka", type: "wajib" },
+            // 6 Syarat Sah
+            { text: "Tempat khas seperti masjid", type: "sah" },
+            { text: "Jemaah minimum 40 orang", type: "sah" },
+            { text: "Dalam waktu Zohor", type: "sah" },
+            { text: "Didirikan secara berjemaah", type: "sah" },
+            { text: "Didahului dengan 2 khutbah", type: "sah" },
+            { text: "Tiada solat Jumaat lain di kariah sama", type: "sah" }
+        ];
+
+        class Bubble {
+            constructor(text, type) {
+                this.text = text;
+                this.type = type;
+                this.radius = 65;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - 200 - this.radius * 2) + this.radius;
+                this.dx = (Math.random() - 0.5) * 2;
+                this.dy = (Math.random() - 0.5) * 2;
+                this.color = "#334155"; 
+                this.borderColor = "#94a3b8";
+                this.feedbackTimer = 0;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = this.borderColor;
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 13px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                
+                // Format teks panjang supaya muat dalam bulatan
+                const words = this.text.split(" ");
+                let line = "";
+                let lines = [];
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + " ";
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > this.radius * 1.6 && n > 0) {
+                        lines.push(line);
+                        line = words[n] + " ";
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+
+                let startY = this.y - ((lines.length - 1) * 8);
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], this.x, startY + (i * 16));
+                }
+            }
+
+            update() {
+                // Pantulan dinding
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) this.dx = -this.dx;
+                if (this.y + this.radius > canvas.height - 150 || this.y - this.radius < 0) this.dy = -this.dy;
+
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Reset warna dari merah ke asal selepas flash
+                if (this.feedbackTimer > 0) {
+                    this.feedbackTimer--;
+                    if (this.feedbackTimer === 0) {
+                        this.color = "#334155";
+                        this.borderColor = "#94a3b8";
+                    }
+                }
+
+                this.draw();
+            }
+
+            flashRed() {
+                this.color = "#ef4444";
+                this.borderColor = "#f87171";
+                this.feedbackTimer = 30; // 30 frames (~0.5 saat)
+            }
+
+            flashGreen() {
+                this.color = "#22c55e";
+                this.borderColor = "#4ade80";
+            }
+        }
+
+        let bubbles = itemsData.map(item => new Bubble(item.text, item.type));
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bubbles.forEach(bubble => bubble.update());
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Drag & Drop logic
+        let draggedType = null;
+
+        function drag(event, type) {
+            draggedType = type;
+        }
+
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const dropY = e.clientY - rect.top;
+
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                let b = bubbles[i];
+                let dist = Math.hypot(dropX - b.x, dropY - b.y);
+
+                if (dist < b.radius) {
+                    if (b.type === draggedType) {
+                        b.flashGreen();
+                        setTimeout(() => {
+                            bubbles.splice(i, 1);
+                            remainingEl.textContent = bubbles.length;
+                            if (bubbles.length === 0) {
+                                alert("Tahniah! Anda telah berjaya menyelesaikan semua soalan!");
+                            }
+                        }, 200);
+                    } else {
+                        b.flashRed();
+                    }
+                    break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
